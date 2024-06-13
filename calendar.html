@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Task and Calendar Management</title>
+        <script src="https://apis.google.com/js/api.js" async defer></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBC4A-F3C04i9fW5yKMO-TiWc_QDkyJfHA&libraries=places" async defer></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto&display=swap">
+        <link rel="stylesheet" href="css/general.css">
+        <style>
+            body {
+                background: url('images/back.jpeg') no-repeat center center fixed;
+                background-size: cover;
+                height:fit-content;
+            }
+            
+            footer{
+                bottom:0px;
+                width:100%;
+                position:relative;
+                padding:5px;
+            }
+            footer p{
+                margin:5px;
+            }
+            
+            .container {
+                display: flex;
+                justify-content: space-between;
+                height: fit-content;
+                align-items: center;
+                min-height:90vh;
+                margin:3% auto;    
+            }
+            
+            h3{
+                font-family: 'Roboto', sans-serif;
+            }
+            
+            .event {
+                width: 15%;
+                border-right: 4px solid #ccc;
+                border-bottom: 4px solid #ccc;
+                padding: 30px;
+                background: rgba(239, 239, 239, 0.8);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+                border-radius: 20px;
+                margin-left: 50px;
+                position: relative;
+            }
+            
+            
+            #create-event-form label {
+                font-family: 'Roboto', sans-serif;
+                display: block;
+                margin-bottom: 2px;
+                font-weight: bold;
+                position: relative;
+                left: 20px;
+            }
+
+            #create-event-form input, #create-event-form textarea, #create-event-form button {
+                width: 80%;
+                margin-bottom: 5px;
+                padding: 5px;
+                border-radius: 4px;
+                border: 1px solid #ddd;
+                position: relative;
+                left: 20px;
+            }
+
+            #create-event-form textarea {
+                height: 50px;
+            }
+
+            #create-event-form button {
+                background-color: #ddebfe;
+                color: black;
+                border: 2px solid black;
+                cursor: pointer;
+                position: relative;
+                left: 25px;
+            }
+
+            #create-event-form button:hover {
+                background-color: grey;
+            }
+
+            
+            .calendar {
+                width: 70%;
+                padding: 0px 20px 0px 20px;
+            }
+            
+            h2 {
+                font-family: 'Raleway', sans-serif;
+                font-size: 20px;
+            }
+            
+            .calendar-iframe {
+                border: 0;
+                width: 100%;
+                height: 500px;
+            }
+            
+        </style>
+    </head>
+    <header>
+         <div class="topnav">
+            <a href="Home.jsp">HOME</a>
+            <a href="addTask.html">TASK</a>
+            <a class="active" href="calendar.html">CALENDAR</a>
+            <a href="weather.html">WEATHER</a>
+            <button id="signout_button" style="font-family: Times New Roman;">Sign Out</button>
+        </div>
+    </header>
+    <body>
+        <div class="container">
+            <div class="event">
+                <h3>Create New Event</h3>
+                <form id="create-event-form">
+                    <label for="event-title">Event Title:</label>
+                    <input type="text" id="event-title" name="event-title" required>
+                    <br><br>
+                    <label for="event-description">Event Description:</label>
+                    <textarea id="event-description" name="event-description"></textarea>
+                    <br><br>
+                    <label for="event-location">Event Location:</label>
+                    <input type="text" id="event-location" name="event-location">
+                    <br><br>
+                    <label for="event-date">Event Date:</label>
+                    <input type="date" id="event-date" name="event-date" required>
+                    <br><br>
+                    <label for="event-time">Event Time:</label>
+                    <input type="time" id="event-time" name="event-time" required>
+                    <br><br>
+                    <button type="submit">Create Event</button>
+                </form>
+            </div>
+            
+            <div class="calendar">
+                <h2>Calendar Events</h2>
+                <iframe id="calendar-iframe" class="calendar-iframe" frameborder="0" scrolling="no"></iframe>
+            </div>
+        </div>
+        <script>
+            document.getElementById('signout_button').onclick = function () {
+                window.location.href = "index.html";
+            };
+            const CLIENT_ID = '84127974674-sh5thorl4pk1drugck81j1o7fp55ug7m.apps.googleusercontent.com';
+            const DISCOVERY_DOCS = [
+                "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
+                "https://www.googleapis.com/discovery/v1/apis/tasks/v1/rest"
+            ];
+            const API_KEY = 'AIzaSyBC4A-F3C04i9fW5yKMO-TiWc_QDkyJfHA';
+            let primaryCalendarId;
+
+            function gapiLoaded() {
+                gapi.load('client', initializeGapiClient);
+            }
+
+            async function initializeGapiClient() {
+                try {
+                    await gapi.client.init({
+                        apiKey: API_KEY,
+                        discoveryDocs: DISCOVERY_DOCS,
+                    });
+                    const token = localStorage.getItem('access_token');
+                    gapi.client.setToken({access_token: token});
+                    await fetchPrimaryCalendarId();
+                    loadCalendarEvents();
+                    const destinationInput = document.getElementById("event-location");
+                    autocomplete = new google.maps.places.Autocomplete(destinationInput);
+                } catch (error) {
+                    console.error('Error initializing Google API client:', error);
+                }
+            }
+
+            async function fetchPrimaryCalendarId() {
+                try {
+                    const response = await gapi.client.calendar.calendarList.list();
+                    const calendars = response.result.items;
+                    const primaryCalendar = calendars.find(calendar => calendar.primary === true);
+                    if (primaryCalendar) {
+                        primaryCalendarId = primaryCalendar.id;
+                    } else {
+                        throw new Error('Primary calendar not found.');
+                    }
+                } catch (error) {
+                    console.error('Error fetching primary calendar ID:', error);
+                }
+            }
+
+            async function loadCalendarEvents() {
+                let response;
+                try {
+                    response = await gapi.client.calendar.events.list({
+                        'calendarId': primaryCalendarId,
+                        'timeMin': (new Date()).toISOString(),
+                        'showDeleted': false,
+                        'singleEvents': true,
+                        'maxResults': 10,
+                        'orderBy': 'startTime'
+                    });
+                } catch (err) {
+                    document.getElementById('content').innerText = err.message;
+                    return [];
+                }
+                const primaryEvents = response.result.items || [];
+                displayEvents(primaryEvents);
+            }
+
+            function displayEvents(events) {
+                const calendarIframe = document.getElementById('calendar-iframe');
+                const src = `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(primaryCalendarId)}&src=en.malaysia%23holiday%40group.v.calendar.google.com&ctz=Asia/Kuala_Lumpur&bgcolor=%23B39DDB&src=bXVsdGltZWRpYXdhdGVycG9sbHV0aW9uQGdtYWlsLmNvbQ&src=ZW4ubWFsYXlzaWEjaG9saWRheUBncm91cC52LmNhbGVuZGFyLmdvb2dsZS5jb20&color=%23039BE5&color=%230B8043&showTitle=0&showPrint=0`;
+                calendarIframe.src = src;
+                calendarIframe.style.border = "solid 1px #777";
+                calendarIframe.width = "800";
+                calendarIframe.height = "600";
+            }
+
+            function checkLibrariesLoaded() {
+                if (typeof gapi !== 'undefined') {
+                    gapiLoaded();
+                } else {
+                    setTimeout(checkLibrariesLoaded, 100);
+                }
+            }
+
+            checkLibrariesLoaded();
+
+            document.getElementById('create-event-form').addEventListener('submit', handleCreateEvent);
+
+            async function handleCreateEvent(event) {
+                event.preventDefault();
+                const title = document.getElementById('event-title').value;
+                const description = document.getElementById('event-description').value;
+                const location = document.getElementById('event-location').value;
+                const date = document.getElementById('event-date').value;
+                const time = document.getElementById('event-time').value;
+                const dateTime = new Date(`${date}T${time}:00`).toISOString();
+
+                try {
+                    const response = await gapi.client.calendar.events.insert({
+                        'calendarId': primaryCalendarId,
+                        'resource': {
+                            'summary': title,
+                            'description': description,
+                            'location': location,
+                            'start': {
+                                'dateTime': dateTime,
+                                'timeZone': 'Asia/Kuala_Lumpur'
+                            },
+                            'end': {
+                                'dateTime': new Date(new Date(dateTime).getTime() + 3600000).toISOString(),
+                                'timeZone': 'Asia/Kuala_Lumpur'
+                            },
+                            'reminders': {
+                                'useDefault': false,
+                                'overrides': [
+                                    {'method': 'popup', 'minutes': 5}
+                                ]
+                            }
+                        }
+                    });
+                    alert('Event created successfully!');
+                    loadCalendarEvents();
+                } catch (error) {
+                    alert('Failed to create event: ' + error.result.error.message);
+                    console.error('Error creating event:', error);
+                }
+            }
+        </script>
+    </body>
+    <footer>
+        <p>&copy;Daily Planner-2024</p>
+    </footer>
+</html>
+
+

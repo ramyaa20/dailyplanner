@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Task and Calendar Management</title>
+        <script src="https://apis.google.com/js/api.js" async defer></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+        <link rel="stylesheet" href="css/general.css">
+        <style>
+            body {
+                background: url('images/back.jpeg') no-repeat center center fixed;
+                background-size: cover;
+                min-height: 100vh;
+            }
+            
+            #section{
+                height:fit-content;
+                min-height: 90vh;
+                margin:3%;
+                padding:0 auto;
+            }
+
+            h1 {
+                padding: 0px 20px;
+                font-size: 27px;
+                text-align: center;
+                font-family: 'Oswald', sans-serif;
+                letter-spacing: 2px;
+                background: linear-gradient(90deg, black, #0066cc); /* Gradient colors */
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                text-shadow: white;
+                display: inline-block;
+            }
+
+            .container {
+                margin: 3% auto;
+                padding: 20px;
+                background: rgba(239, 239, 239, 0.8);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+                border-radius: 20px;
+                max-width: 500px;
+            }
+
+            .tasks {
+                padding:auto;
+                height:fit-content;
+            }
+
+            h2 {
+                font-size: 20px;
+            }
+            .task-item {
+                background-color: rgba(0, 0, 0, 0.1);
+                border-radius: 10px;
+                padding: 10px;
+                margin-bottom: 10px;
+                display: flex;
+                width: 80%;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            #task-list {
+                font-size:15px;
+                padding: 10px 30px;
+                display: block;
+                margin: auto;
+                position: relative;
+                left: 38px;
+            }
+            #current-date {
+                margin: 10px 30px;
+                padding: 10px;
+                border: 1px solid #000;
+                border-radius: 5px;
+                background-color: #ddebfe;
+                text-align: center;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            .add-task-icon {
+                width: 20px;
+                height: 20px;
+                line-height: 20px;
+                text-align: center;
+                background-color: none;
+                color: black;
+                font-size: 24px;
+                border-radius: 50%;
+                cursor: pointer;
+                user-select: none;
+                margin-bottom: 10px;
+                position: relative;
+                left: 110px;
+                top: -40px;
+            }
+
+            .add-task-icon:hover {
+                background-color: #ddebfe;
+            }
+            footer{
+                bottom:0px;
+                width:100%;
+                position:relative;
+                padding:5px;
+            }
+            footer p{
+                margin:5px;
+            }
+        </style>
+    </head>
+
+    <body>
+        <header>
+            <div class="topnav">
+                <a href="Home.jsp">HOME</a>
+                <a class="active" href="addTask.html">TASK</a>
+                <a href="calendar.html">CALENDAR</a>
+                <a href="weather.html">WEATHER</a>
+                <button id="signout_button" style="font-family: Times New Roman;">Sign Out</button>
+            </div>
+        </header>
+        <div id="section">
+            <h1>Daily Tasks</h1>
+            <div class="tasks">
+                <div class="container">
+                    <h2>To-Do-List</h2>
+                    <div id="add-task-icon" class="add-task-icon">+</div>
+                    <p id="current-date"></p>
+                    <ul id="task-list"></ul>
+                </div>
+            </div>
+        </div>
+        <footer>
+            <p>&copy;Daily Planner-2024</p>
+        </footer>
+    </body>
+
+
+    <script>
+        document.getElementById('signout_button').onclick = function () {
+            window.location.href = "index.html";
+        };
+
+        function displayCurrentDate() {
+            const currentDate = new Date();
+            const options = {year: 'numeric', month: 'long', day: 'numeric'};
+            const formattedDate = currentDate.toLocaleDateString(undefined, options);
+            document.getElementById('current-date').textContent = `Today: ${formattedDate}`;
+        }
+
+        displayCurrentDate();
+
+        const CLIENT_ID = '84127974674-sh5thorl4pk1drugck81j1o7fp55ug7m.apps.googleusercontent.com';
+        const DISCOVERY_DOCS = [
+            "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
+            "https://www.googleapis.com/discovery/v1/apis/tasks/v1/rest"
+        ];
+        const API_KEY = 'AIzaSyBC4A-F3C04i9fW5yKMO-TiWc_QDkyJfHA';
+
+        function gapiLoaded() {
+            gapi.load('client', initializeGapiClient);
+        }
+
+        async function initializeGapiClient() {
+            await gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: DISCOVERY_DOCS,
+            });
+            const token = localStorage.getItem('access_token');
+            gapi.client.setToken({access_token: token});
+            loadTasks();
+        }
+
+        function checkLibrariesLoaded() {
+            if (typeof gapi !== 'undefined') {
+                gapiLoaded();
+            } else {
+                setTimeout(checkLibrariesLoaded, 100);
+            }
+        }
+
+        checkLibrariesLoaded();
+
+        function loadTasks() {
+            const accessToken = localStorage.getItem('access_token');
+            if (accessToken) {
+                gapi.auth.setToken({access_token: accessToken});
+                gapi.client.tasks.tasks.list({
+                    tasklist: '@default'
+                }).then(function (response) {
+                    var tasks = response.result.items;
+                    var taskList = $('#task-list');
+                    taskList.empty();
+                    tasks.forEach(function (task) {
+                        taskList.append(`<li class="task-item" data-task-id="${task.id}">
+                            <span class="task-title">${task.title}</span>
+                            <div class="edit-controller">
+                                <i class="fa-solid fa-check deleteBtn"></i>
+                                <i class="fa-solid fa-pen-to-square editBtn"></i>
+                            </div>
+                        </li>`);
+                    });
+                }).catch(function (error) {
+                    console.error('Error loading tasks:', error);
+                });
+            } else {
+                console.error('Access token not found.');
+            }
+        }
+
+        $('#add-task-icon').click(function () {
+            var newTaskTitle = prompt('Enter task title:');
+            if (newTaskTitle) {
+                gapi.client.tasks.tasks.insert({
+                    tasklist: '@default',
+                    resource: {
+                        title: newTaskTitle
+                    }
+                }).then(function (response) {
+                    loadTasks();
+                }).catch(function (error) {
+                    console.error('Error adding task:', error);
+                });
+            }
+        });
+
+        $(document).on('click', '.deleteBtn', function () {
+            var taskId = $(this).closest('.task-item').attr('data-task-id');
+            deleteTask(taskId);
+        });
+
+        function deleteTask(taskId) {
+            gapi.client.tasks.tasks.delete({
+                tasklist: '@default',
+                task: taskId
+            }).then(function (response) {
+                loadTasks();
+            }).catch(function (error) {
+                console.error('Error deleting task:', taskId, error);
+            });
+        }
+
+        $(document).on('click', '.editBtn', function () {
+            var taskItem = $(this).closest('.task-item');
+            var taskId = taskItem.attr('data-task-id');
+            var newTaskTitle = prompt('Enter new task title:');
+            if (newTaskTitle) {
+                editTask(taskId, newTaskTitle);
+            }
+        });
+
+        async function editTask(taskId, newTaskTitle) {
+            try {
+                const response = await gapi.client.tasks.tasks.patch({
+                    tasklist: '@default',
+                    task: taskId,
+                    resource: {
+                        title: newTaskTitle
+                    }
+                });
+                console.log('Task updated successfully:', response);
+                const taskItem = $(`.task-item[data-task-id="${taskId}"]`);
+                taskItem.find('.task-title').text(newTaskTitle);
+            } catch (error) {
+                console.error('Error updating task:', error);
+            }
+        }
+    </script>
+
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Google One Tap Sign-In</title>
+        <script src="https://accounts.google.com/gsi/client" async defer></script>
+        <script src="https://apis.google.com/js/api.js" async defer onload="gapiLoaded()"></script>
+        <style>
+            body {
+                background-image: url("images/login.jpg");
+                background-color: #f4f4f4;
+                background-repeat: no-repeat;
+                background-size: cover;
+                height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                margin: 0;
+            }
+
+            #authorize_button {
+                padding:15px;
+                width: 200px;
+                font-size: 25px;
+                border-radius: 20px;
+                background-color: #393b3a;
+                color: white;
+                font-weight: bold;
+                text-shadow: 3px 3px 6px #87f5f5;
+                cursor: pointer;
+                border: none;
+                box-shadow: 7px 8px 7px rgba(0, 0, 0, 1);
+            }
+
+            #authorize_button:hover {
+                background-color: #0056b3;
+            }
+        </style>
+    </head>
+    <body>
+        <button id="authorize_button">Log In</button>
+
+        <script>
+            const CLIENT_ID = '84127974674-sh5thorl4pk1drugck81j1o7fp55ug7m.apps.googleusercontent.com';
+            const API_KEY = 'AIzaSyBC4A-F3C04i9fW5yKMO-TiWc_QDkyJfHA';
+            const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
+            const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+            const TASKS_SCOPE = "https://www.googleapis.com/auth/tasks";
+
+            let tokenClient;
+            let gapiInited = false;
+            let gisInited = false;
+
+            document.getElementById('authorize_button').onclick = handleAuthClick;
+
+            function gapiLoaded() {
+                gapi.load('client', initializeGapiClient);
+            }
+
+            async function initializeGapiClient() {
+                await gapi.client.init({
+                    apiKey: API_KEY,
+                    discoveryDocs: DISCOVERY_DOCS,
+                });
+                gapiInited = true;
+                maybeEnableButtons();
+            }
+
+            function gisLoaded() {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: CALENDAR_SCOPE,
+                    callback: '',
+                });
+                gisInited = true;
+                maybeEnableButtons();
+            }
+
+            function maybeEnableButtons() {
+                if (gapiInited && gisInited) {
+                    document.getElementById('authorize_button').style.display = 'block';
+                }
+            }
+
+            function handleAuthClick() {
+                tokenClient.callback = async (resp) => {
+                    if (resp.error !== undefined) {
+                        throw (resp);
+                    }
+                    const token = gapi.client.getToken().access_token;
+                    localStorage.setItem('access_token', token);
+                    window.location.href = 'Home.jsp';
+                };
+
+                tokenClient.requestAccessToken({
+                    prompt: 'consent',
+                    scope: TASKS_SCOPE
+                });
+            }
+
+            function checkLibrariesLoaded() {
+                if (typeof gapi !== 'undefined' && typeof google !== 'undefined') {
+                    gapiLoaded();
+                    gisLoaded();
+                } else {
+                    setTimeout(checkLibrariesLoaded, 100);
+                }
+            }
+
+            checkLibrariesLoaded();
+        </script>
+    </body>
+</html>
